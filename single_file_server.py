@@ -5,6 +5,7 @@ import sys
 import threading
 from html import escape
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import quote
 
 import tkinter as tk
 
@@ -17,6 +18,19 @@ def human_size(num):
                 return f"{int(num)} B"
             return f"{num:.1f} {unit}"
         num /= 1024
+
+
+def content_disposition(name):
+    fallback = (
+        name.encode("latin-1", "replace").decode("latin-1").replace('"', "'").replace("\\", "_")
+    )
+    try:
+        name.encode("latin-1")
+    except UnicodeEncodeError:
+        encoded = quote(name.encode("utf-8"))
+        return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+    safe = name.replace('"', "'").replace("\\", "_")
+    return f"attachment; filename=\"{safe}\""
 
 
 def get_local_ips():
@@ -94,10 +108,9 @@ class SingleFileHandler(BaseHTTPRequestHandler):
             with open(file_path, "rb") as f:
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
-                disp_name = os.path.basename(file_path).replace('"', "")
                 self.send_header(
                     "Content-Disposition",
-                    f'attachment; filename="{disp_name}"',
+                    content_disposition(os.path.basename(file_path)),
                 )
                 self.send_header("Content-Length", str(os.path.getsize(file_path)))
                 self.end_headers()
